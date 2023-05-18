@@ -1,0 +1,10 @@
+#!/bin/bash
+echo "Select target window"
+WID=`xdotool selectwindow`
+
+echo "Enter data"
+VKBD=$(<`which vkbd-clipsy`);
+DATA_LINE=`python3 <<<"$VKBD"`
+
+echo "Paste to the selected target:"
+clipsy $WID <<< "$DATA_LINE"

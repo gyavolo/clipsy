@@ -1,0 +1,574 @@
+#!/usr/bin/python3
+import random
+import sys
+import time
+from tkinter import *
+
+# Constants:
+BLINK_TIME = 0.25
+kb_file = "pixmaps/vkbd-clipsy.png"
+kb_dimensions = (576, 155)
+def key_definitions():
+    return [
+        [3, 1, 40, 30, tildf],
+        [42, 1, 76, 30, onef],
+        [78, 1, 112, 30, twof],
+        [114, 1, 148, 30, threef],
+        [150, 1, 184, 30, fourf],
+        [186, 1, 220, 30, fivef],
+        [221, 1, 256, 30, sixf],
+        [258, 1, 292, 30, sevenf],
+        [294, 1, 328, 30, eightf],
+        [330, 1, 364, 30, ninef],
+        [366, 1, 400, 30, zerof],
+        [402, 1, 448, 30, minusf],
+        [449, 1, 506, 30, plusf],
+        [508, 1, 572, 30, backf],
+
+        [8, 32, 58, 61, tabf],
+        [60, 32, 96, 61, qf],
+        [98, 32, 137, 61, wf],
+        [139, 32, 173, 61, ef],
+        [175, 32, 210, 61, rf],
+        [212, 32, 246, 61, tf],
+        [248, 32, 282, 61, yf],
+        [284, 32, 320, 61, uf],
+        [322, 32, 352, 61, iff],
+        [354, 32, 390, 61, of],
+        [392, 32, 426, 61, pf],
+        [428, 32, 475, 61, opbrf],
+        [477, 32, 524, 61, clbrf],
+        [526, 32, 568, 61, bcslashf],
+
+        [7, 63, 80, 92, capslkf],
+        [82, 63, 117, 92, af],
+        [119, 63, 153, 92, sf],
+        [155, 63, 191, 92, df],
+        [193, 63, 227, 92, ff],
+        [229, 63, 265, 92, gf],
+        [267, 63, 303, 92, hf],
+        [305, 63, 335, 92, jf],
+        [337, 63, 372, 92, kf],
+        [374, 63, 407, 92, lf],
+        [409, 63, 451, 92, colmf],
+        [453, 63, 497, 92, aphf],
+        [499, 63, 568, 92, enterf],
+
+        [1, 94, 81, 123, shiftf],
+        [83, 94, 118, 123, zf],
+        [120, 94, 155, 123, xf],
+        [157, 94, 192, 123, cf],
+        [194, 94, 229, 123, vf],
+        [231, 94, 266, 123, bf],
+        [268, 94, 304, 123, nf],
+        [306, 94, 344, 123, mf],
+        [346, 94, 395, 123, lessf],
+        [397, 94, 446, 123, grf],
+        [448, 94, 493, 123, quesf],
+        [495, 94, 575, 123, shiftf],
+
+        [146, 125, 364, 154, spacef],
+        [366, 125, 429, 154, movef],
+    ]
+
+# Global flags:
+shift_on = False
+caps_on = False
+capslk_on = False
+rpos_on = False
+move_on = False
+blink_on = True
+
+# The root window:
+root = None
+root_dimensions = None
+# The actual keyboard position:
+kbpos = None
+# Key definition table:
+keys = None
+
+# Parse command line arguments if any:
+if len(sys.argv) > 1:
+    import argparse
+    parser = argparse.ArgumentParser(description ='Simple onscreen text line entry')
+    parser.add_argument('-r', dest ='rpos',
+                        action ='store_true', help ='place the keyboard randomly')
+    parser.add_argument('-R', dest ='move',
+                        action ='store_true', help ='move the keyboard on every keypress')
+    parser.add_argument('-b', dest ='blink',
+                        action ='store_false', help ='no blinking')
+    args = parser.parse_args()
+    rpos_on = args.rpos
+    move_on = args.move
+    if move_on: rpos_on = True
+    blink_on = args.blink
+
+
+# Function definitions:
+
+def click_cb(event):
+    x = event.x - kbpos[0]
+    y = event.y - kbpos[1]
+    k = [k for k in keys if k[0] < x < k[2] and k[1] < y < k[3]]
+    if len(k) == 1:
+        press(k[0][4])
+
+
+def show_root(move = False):
+    global root, root_dimensions, kbpos
+
+    # Create the root window, but hide it first to reduce flickering:
+    root = Tk()
+    if blink_on: time.sleep(BLINK_TIME)
+    root.overrideredirect(True)
+    root.wm_attributes('-alpha', 0)
+    root.wm_attributes('-type', 'splash')
+    root.update()
+    root.withdraw()
+    root.wm_attributes('-alpha', 0)
+
+    # Calculate the center of the screen, (random) geometry for the root window and kbd position:
+    if move or root_dimensions is None:
+        if move_on or rpos_on:
+            root_dimensions = (2 * kb_dimensions[0] + random.randint(0, int(kb_dimensions[0] / 2)),
+                               2 * kb_dimensions[1] + random.randint(0, int(kb_dimensions[1] / 2)))
+        else:
+            root_dimensions = kb_dimensions
+    if move or kbpos is None:
+        if move_on or rpos_on:
+            kbpos = (random.randint(0, root_dimensions[0] - kb_dimensions[0]),
+                     random.randint(0, root_dimensions[1] - kb_dimensions[1]))
+        else:
+            kbpos = (0, 0)
+    root.geometry('{}x{}+{}+{}'.format(root_dimensions[0],
+                                       root_dimensions[1],
+                                       int((root.winfo_screenwidth() - root_dimensions[0]) / 2),
+                                       int((root.winfo_screenheight() - root_dimensions[1]) / 2)))
+
+    # If widgets are used, the window will be suspicious. We don't want to reveal what it is.
+    # So, load an image of a keyboard instead, with button coordinates defined in key_definitions:
+    canvas = Canvas(root)
+    canvas.bind("<Button-1>", click_cb)
+    show_root.img = PhotoImage(file = kb_file)
+    canvas.create_image(kbpos[0], kbpos[1], anchor = NW, image = show_root.img)
+    canvas.pack(expand = YES, fill = BOTH)
+
+    root.deiconify()
+    root.wait_visibility(canvas)
+    # We can finally show it now:
+    root.wm_attributes('-alpha', 1)
+    root.update()
+
+
+def blink(movable = True):
+    if not (blink_on or move_on):
+        return
+    # Hide to reduce flickering:
+    root.wm_attributes('-alpha', 0)
+    root.update()
+    # Now hide it really well:
+    root.destroy()
+    # Create again and show when ready::
+    show_root(move_on and movable)
+
+
+def press(fn):
+    global shift_on, caps_on
+    if fn in(movef, shiftf, capslkf, enterf):
+        # Special buttons blink and shift differently, so just call and let them decide:
+        fn()
+        return
+    blink()
+    fn()
+    shift_on = False
+    caps_on = capslk_on
+
+
+# Special key functions:
+
+def movef():
+    global move_on, blink_on
+    if movef.off_state is None:
+        # Toggle move and blink:
+        movef.off_state = (move_on,
+                           blink_on)
+        move_on = not move_on
+        if move_on: blink_on = True
+    else:
+        # Restore the initial state:
+        move_on = movef.off_state[0]
+        blink_on = movef.off_state[1]
+        movef.off_state = None
+    blink()
+movef.off_state = None
+
+
+def shiftf():
+    global shift_on, caps_on
+    blink(False)
+    shift_on = True
+    if not capslk_on:
+        caps_on = True
+    else:
+        caps_on = False
+
+
+def capslkf():
+    global caps_on, capslk_on
+    blink(False)
+    capslk_on = not capslk_on
+    caps_on = capslk_on
+
+
+def enterf():
+    print("\n", end="")
+    root.quit()
+
+
+# Regular key functions:
+
+def minusf():
+    if shift_on:
+        print("_", end="")
+    else:
+        print("-", end="")
+
+
+def plusf():
+    if shift_on:
+        print("+", end="")
+    else:
+        print("=", end="")
+
+
+def opbrf():
+    if shift_on:
+        print("{", end="")
+    else:
+        print("[", end="")
+
+
+def clbrf():
+    if shift_on:
+        print("}", end="")
+    else:
+        print("]", end="")
+
+
+def bcslashf():
+    if shift_on:
+        print("|", end="")
+    else:
+        print("\\", end="")
+
+
+def quesf():
+    if shift_on:
+        print("?", end="")
+    else:
+        print("/", end="")
+
+
+def colmf():
+    if shift_on:
+        print(":", end="")
+    else:
+        print(";", end="")
+
+
+def aphf():
+    if shift_on:
+        print('"', end="")
+    else:
+        print("'", end="")
+
+
+def lessf():
+    if shift_on:
+        print("<", end="")
+    else:
+        print(",", end="")
+
+
+def grf():
+    if shift_on:
+        print(">", end="")
+    else:
+        print(".", end="")
+
+
+def tildf():
+    if shift_on:
+        print("`", end="")
+    else:
+        print("~", end="")
+
+
+def onef():
+    if shift_on:
+        print("!", end="")
+    else:
+        print("1", end="")
+
+
+def twof():
+    if shift_on:
+        print("@", end="")
+    else:
+        print("2", end="")
+
+
+def threef():
+    if shift_on:
+        print("#", end="")
+    else:
+        print("3", end="")
+
+
+def fourf():
+    if shift_on:
+        print("$", end="")
+    else:
+        print("4", end="")
+
+
+def fivef():
+    if shift_on:
+        print("%", end="")
+    else:
+        print("5", end="")
+
+
+def sixf():
+    if shift_on:
+        print("^", end="")
+    else:
+        print("6", end="")
+
+
+def sevenf():
+    if shift_on:
+        print("&", end="")
+    else:
+        print("7", end="")
+
+
+def eightf():
+    if shift_on:
+        print("*", end="")
+    else:
+        print("8", end="")
+
+
+def ninef():
+    if shift_on:
+        print("(", end="")
+    else:
+        print("9", end="")
+
+
+def zerof():
+    if shift_on:
+        print(")", end="")
+    else:
+        print("0", end="")
+
+
+def backf():
+    print("\b", end="")
+
+
+def tabf():
+    print("    ", end="")
+
+
+def spacef():
+    print(" ", end="")
+
+
+def af():
+    if caps_on:
+        print("A", end="")
+    else:
+        print("a", end="")
+
+
+def bf():
+    if caps_on:
+        print("B", end="")
+    else:
+        print("b", end="")
+
+
+def cf():
+    if caps_on:
+        print("C", end="")
+    else:
+        print("c", end="")
+
+
+def df():
+    if caps_on:
+        print("D", end="")
+    else:
+        print("d", end="")
+
+
+def ef():
+    if caps_on:
+        print("E", end="")
+    else:
+        print("e", end="")
+
+
+def ff():
+    if caps_on:
+        print("F", end="")
+    else:
+        print("f", end="")
+
+
+def gf():
+    if caps_on:
+        print("G", end="")
+    else:
+        print("g", end="")
+
+
+def hf():
+    if caps_on:
+        print("H", end="")
+    else:
+        print("h", end="")
+
+
+def iff():
+    if caps_on:
+        print("I", end="")
+    else:
+        print("i", end="")
+
+
+def jf():
+    if caps_on:
+        print("J", end="")
+    else:
+        print("j", end="")
+
+
+def kf():
+    if caps_on:
+        print("K", end="")
+    else:
+        print("k", end="")
+
+
+def lf():
+    if caps_on:
+        print("L", end="")
+    else:
+        print("l", end="")
+
+
+def mf():
+    if caps_on:
+        print("M", end="")
+    else:
+        print("m", end="")
+
+
+def nf():
+    if caps_on:
+        print("N", end="")
+    else:
+        print("n", end="")
+
+
+def of():
+    if caps_on:
+        print("O", end="")
+    else:
+        print("o", end="")
+
+
+def pf():
+    if caps_on:
+        print("P", end="")
+    else:
+        print("p", end="")
+
+
+def qf():
+    if caps_on:
+        print("Q", end="")
+    else:
+        print("q", end="")
+
+
+def rf():
+    if caps_on:
+        print("R", end="")
+    else:
+        print("r", end="")
+
+
+def sf():
+    if caps_on:
+        print("S", end="")
+    else:
+        print("s", end="")
+
+
+def tf():
+    if caps_on:
+        print("T", end="")
+    else:
+        print("t", end="")
+
+
+def uf():
+    if caps_on:
+        print("U", end="")
+    else:
+        print("u", end="")
+
+
+def vf():
+    if caps_on:
+        print("V", end="")
+    else:
+        print("v", end="")
+
+
+def wf():
+    if caps_on:
+        print("W", end="")
+    else:
+        print("w", end="")
+
+
+def xf():
+    if caps_on:
+        print("X", end="")
+    else:
+        print("x", end="")
+
+
+def yf():
+    if caps_on:
+        print("Y", end="")
+    else:
+        print("y", end="")
+
+
+def zf():
+    if caps_on:
+        print("Z", end="")
+    else:
+        print("z", end="")
+
+
+# Finally we can load the key definitions and show the keyboard:
+keys = key_definitions() # Only after all key functions are defined
+show_root()
+root.mainloop()
